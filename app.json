@@ -1,6 +1,15 @@
 {
   "expo": {
     "sdkVersion": "22.0.0",
-    "icon": "./Resources/AppinMail.png"
+    "icon": "./Resources/AppinMail.png",
+    "name": "Promail",
+    "version": "0.1.0",
+    "slug": "Promail",
+    "ios": {
+      "bundleIdentifier": "io.appinmail.promail"
+    },
+    "android": {
+      "package": "io.appinmail.promail"
+    }
   }
 }
