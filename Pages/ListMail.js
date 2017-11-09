@@ -1,4 +1,4 @@
-import React, { Component } from 'react'
+import React, { Component } from 'react';
 
 import {
   StyleSheet,
@@ -7,6 +7,7 @@ import {
   TouchableHighlight,
   FlatList,
   Text,
+  ScrollView
 } from 'react-native';
 
 import Mail from './Mail'
@@ -25,10 +26,11 @@ class ListItem extends React.PureComponent {
 
   render() {
     const item = this.props.item;
+
     return (
       <TouchableHighlight
         onPress={this._onPress}
-        underlayColor='#dddddd'>
+        underlayColor='#dddddd' >
         <View>
           <View style={styles.rowContainer}>
             <Image style={styles.thumb} source = {require('../Resources/mail.png')}/>
@@ -65,24 +67,17 @@ export default class ListMail extends Component {
     this.setState({
       visible: true
     });
-    //console.log(item)
-    //this.props.navigator.push({
-      //title: item.subject,
-      //component: Mail,
-      //passProps: {listings: item}
-    //});
     this.props.navigation.navigate('Mail', { title: item.subject, listings: item });
   };
 
   render() {
-    //console.log(this.props.navigation.state.params.listings)
     const mails = this.props.navigation.state.params.listings
     return (
-      <FlatList
-        data={mails}
-        keyExtractor={this._keyExtractor}
-        renderItem={this._renderItem}
-      />
+        <FlatList style={styles.highlight}
+          data={mails}
+          keyExtractor={this._keyExtractor}
+          renderItem={this._renderItem}
+        />
     );
   }
 }
@@ -93,6 +88,9 @@ const styles = StyleSheet.create({
     height: 18,
     marginRight: 10,
     marginTop: 3
+  },
+  highlight: {
+    backgroundColor: '#FFF',
   },
   textContainer: {
     flex: 1

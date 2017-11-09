@@ -1,7 +1,8 @@
 import React, { Component } from 'react';
 import md5 from "react-native-md5";
 import Spinner from 'react-native-loading-spinner-overlay';
-import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view'
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import dismissKeyboard from 'react-native-dismiss-keyboard';
 
 import {
   StyleSheet,
@@ -10,9 +11,9 @@ import {
   TextInput,
   Image,
   TouchableOpacity,
+  Linking
 } from 'react-native';
 
-//import Container from '../Components/Container';
 import Button from '../Components/Button';
 import Label from '../Components/Label';
 
@@ -21,124 +22,111 @@ import ListMail from './ListMail'
 export default class Login extends Component {
 
   constructor(props) {
-    super();
+    super(props);
     this.state = {
-      visible: false
+      visible: false, loginHasFocus: false, passwdHasFocus: false
     };
   }
 
-  getInitialState() {
-    return {
-      borderBottomColor: '#f0f0f0',
-      borderBottomWidth: 1
-    }
-  }
-
-  onFocus() {
-    this.setState({
-      borderBottomColor: '#da0750',
-      borderBottomWidth: 1
-    })
-  }
-
-  onBlur() {
-    this.setState({
-      borderBottomColor: '#f0f0f0',
-      borderBottomWidth: 1
-    })
-  }
-
-  onTestPress = () => {
-    //setInterval(() => {
-      this.setState({
-        visible: true
-      });
-    //}, 1000);
-    //console.log(md5.hex_md5(this.state.password));
-
-    const data = {'user_id': this.state.login,'password_md5': md5.hex_md5(this.state.password)};
-    return fetch(`https://admin.appinmail.io/api/v1/experimental/promail/prepare_user_runtime_2?user_id=${data.user_id}&password_md5=${data.password_md5}`, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'},
+  getAuthToken = (login, passwd) => {
+  	return fetch(`https://admin.appinmail.io/api/v1/experimental/promail/prepare_user_runtime_2?user_id=${login}&password_md5=${passwd}`,{
+    	method: 'POST',
+    	headers: {'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'}
     }).then((response) => response.json())
-      .then((responseJson) => {
-       if (responseJson[0] == 'success'){
-         url = responseJson[1]['promail_url'];
-         token = responseJson[1]['access_token'];
-         //console.log(url);
-         //doLogin(url, access_token)
-         const data = {'action_name': 'login','xml_data': JSON.stringify({'login':this.state.login, 'token': token})};
-         return fetch(url+`/restapi.py?action_name=${data.action_name}&xml_data=${data.xml_data}`, {
-           method: 'POST',
-           headers: {'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'},
-         }).then((response) => response.json())
-         .then((responseJson) => {
-         if (responseJson[0] == 'success')
-           {
-             const data = {'action_name': 'eac_list','xml_data': JSON.stringify({'mailbox': '@AppInMail'}), 'sid':responseJson[1]['sid']}
-             return fetch(url+`/restapi.py?action_name=${data.action_name}&xml_data=${data.xml_data}&sid=${data.sid}`, {
-               method: 'POST',
-               headers: {'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'}
-             }).then((response) => response.json())
-             .then((responseJson) => {
-
-               if (responseJson[0] == 'success')
-               {
-                 var arrayLength = responseJson[1].length;
-                 global.url = url;
-                 global.sid = data.sid;
-
-                 //this.props.navigator.push({
-                //   title: 'Mails list',
-                //   component: ListMail,
-                //   passProps: {listings: responseJson[1]}
-                 //});
-                 //console.log(responseJson[1])
-                 this.props.navigation.navigate('ListMail', { listings: responseJson[1] });
-                 this.setState({
-                   visible: false
-                 });
-               }
-             })
-             .catch((error) => {
-               console.error(error);
-             });
-
-
-         }
-         else
-           console.log('something wrong');
-
-         })
-         .catch((error) => {
-           console.error(error);
-         });
-
-
-       } else {
-         console.log('something wrong');
-       }
+    .then((responseJson) => {
+       	if (responseJson[0] == 'success'){
+         	url = responseJson[1]['promail_url'];
+         	token = responseJson[1]['access_token'];
+          global.url = url;
+          global.token = token;
+          return ([ url, token])
+        }
+        else {
+        	console.log('wrong passwd or login');
+        }
       })
       .catch((error) => {
         console.error(error);
       });
   }
 
+  loginIn = (url, action, data) => {
+    return fetch(url+`/restapi.py?action_name=${action}&xml_data=${data}`,{
+    	method: 'POST',
+    	headers: {'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'}
+    }).then((response) => response.json())
+    .then((responseJson) => {
+       	if (responseJson[0] == 'success'){
+          sid = responseJson[1]['sid'];
+         	global.sid = sid;
+          return (sid)
+        }
+        else {
+        	console.log('something wrong');
+        }
+      })
+      .catch((error) => {
+        console.error(error);
+      });
+  }
+
+  getListMail = (url, action, data, sid) => {
+    return fetch(url+`/restapi.py?action_name=${action}&xml_data=${data}&sid=${sid}`,{
+    	method: 'POST',
+    	headers: {'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'}
+    }).then((response) => response.json())
+    .then((responseJson) => {
+       	if (responseJson[0] == 'success'){
+          listMail = responseJson[1];
+          return (listMail)
+        }
+        else {
+        	console.log('something wrong');
+        }
+      })
+      .catch((error) => {
+        console.error(error);
+      });
+  }
+
+  onTestPress = () => {
+    dismissKeyboard();
+    this.setState({
+      visible: true,
+
+    });
+
+    this.getAuthToken(this.state.login, md5.hex_md5(this.state.password)).then((ret) => {
+      [url, token] = ret;
+      this.loginIn(url, 'login', JSON.stringify({'login':this.state.login, 'token': token})).then( (sid) => {
+        this.getListMail(url, 'eac_list',JSON.stringify({'mailbox': '@AppInMail'}), sid).then( (listMail ) =>{
+          this.props.navigation.navigate('ListMail', { listings: listMail });
+          this.setState({
+            visible: false
+          });
+        });
+      });
+    });
+  }
+
   render() {
     return (
         <KeyboardAwareScrollView
-            innerRef={ref => {this.scroll = ref}}
-            style={styles.scroll}
-            extraHeight={270} >
+          keyboardShouldPersistTaps={'always'}
+          innerRef={ref => {this.scroll = ref}}
+          style={styles.scroll}
+          extraHeight={200}
+          //enableOnAndroid={true}
+          >
           <View style={{height: 100, alignItems: 'center', justifyContent: 'center', marginBottom: 60 }}>
             <Image source = {require('../Resources/welcome_message_head.png')}/>
           </View>
           <View style={{ marginBottom: 20 }}>
             <TextInput
-              style={styles.textInput}
+              style={this.state.loginHasFocus ? styles.textInput_focused : styles.textInput_unfocused}
               selectTextOnFocus={true}
-              onBlur={ () => this.onBlur() }
-              onFocus={ () => this.onFocus() }
+              onBlur={ () => {this.setState({loginHasFocus: !this.state.loginHasFocus})}}
+              onFocus={ () => {this.setState({loginHasFocus: !this.state.loginHasFocus})}}
               underlineColorAndroid={'transparent'}
               onChangeText={(text) => this.setState({
                   login: text,
@@ -147,10 +135,10 @@ export default class Login extends Component {
           </View>
           <View style={{ marginBottom: 20 }}>
             <TextInput
-              onBlur={ () => this.onBlur() }
-              onFocus={ () => this.onFocus() }
+              onBlur={ () => {this.setState({passwdHasFocus: !this.state.passwdHasFocus})}}
+              onFocus={ () => {this.setState({passwdHasFocus: !this.state.passwdHasFocus})}}
               secureTextEntry={true}
-              style={styles.textInput}
+              style={this.state.passwdHasFocus ? styles.textInput_focused : styles.textInput_unfocused}
               clearTextOnFocus={true}
               underlineColorAndroid={'transparent'}
               onChangeText={(text) => this.setState({
@@ -169,13 +157,13 @@ export default class Login extends Component {
               </View>
               <View style={{ flex: 1 }}>
                 <Spinner visible={this.state.visible} textStyle={{color: '#FFF'}} />
-                </View>
-                <View style={{ marginBottom: 20 }}>
-              <Button
-                label="Forgot password?"
-                styles={{button: styles.buttonForgot, label: styles.label1}}
-                //onPress={this.press.bind(this)}
-              />
+              </View>
+              <View style={{ marginBottom: 20 }}>
+                <Button
+                  label="Forgot password?"
+                  styles={{button: styles.buttonForgot, label: styles.label1}}
+                  onPress={() => {Linking.openURL('https://admin.appinmail.io/login')}}
+                />
               </View>
           </View>
         </KeyboardAwareScrollView>
@@ -185,9 +173,11 @@ export default class Login extends Component {
 
 const styles = StyleSheet.create({
     scroll: {
+      flex: 1,
       padding: 30,
       flexDirection: 'column',
-      backgroundColor: '#FFF'
+      backgroundColor: '#FFF',
+      height: '100%'
    },
    buttonWhiteText: {
      fontSize: 20,
@@ -216,10 +206,16 @@ const styles = StyleSheet.create({
      textDecorationStyle: "solid",
      textDecorationColor: "#da0750"
    },
-   textInput: {
+   textInput_unfocused: {
      height: 60,
      fontSize: 20,
      borderBottomColor: '#f0f0f0',
+     borderBottomWidth: 1
+   },
+   textInput_focused: {
+     height: 60,
+     fontSize: 20,
+     borderBottomColor: '#da0750',
      borderBottomWidth: 1
    }
 });

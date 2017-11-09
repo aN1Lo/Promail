@@ -1,4 +1,5 @@
 import React from 'react';
+import { Platform, StatusBar } from 'react-native';
 import { StackNavigator } from 'react-navigation';
 
 import Login from '../Pages/Login';
@@ -6,6 +7,7 @@ import ListMail from '../Pages/ListMail';
 import Mail from '../Pages/Mail';
 
 export const MailStack = StackNavigator({
+
   Login: {
     screen: Login,
     navigationOptions: {
