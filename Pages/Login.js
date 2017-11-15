@@ -11,20 +11,56 @@ import {
   TextInput,
   Image,
   TouchableOpacity,
-  Linking
+  Linking,
+  AsyncStorage
 } from 'react-native';
 
 import Button from '../Components/Button';
 import Label from '../Components/Label';
 
-import ListMail from './ListMail'
+import ListMail from './ListMail';
 
 export default class Login extends Component {
+  /*componentWillMount(){
+    try{
+      AsyncStorage.clear();
+    } catch(error){
+      console.log(error);
+    }
+  }*/
+  componentDidMount() {
+    try {
+      AsyncStorage.getItem('login').then(login => {
+        if (login !== null){
+          this.setState({
+            visible: true,
+          });
+          AsyncStorage.getItem('passwd_md5').then(passwd_md5 => {
+            this.getAuthToken(login, passwd_md5).then((ret) => {
+              [url, token] = ret;
+              this.loginIn(url, 'login', JSON.stringify({'login':this.state.login, 'token': token})).then( (sid) => {
+                this.getListMail(url, 'eac_list',JSON.stringify({'mailbox': '@AppInMail'}), sid).then( (listMail ) =>{
+                  this.props.navigation.navigate('ListMail', { listings: listMail });
+                  this.setState({
+                    visible: false,
+                  });
+                });
+              });
+            });
+          })
+        }
+      })
+    } catch (error) {
+      console.log("Error retrieving data: " + error);
+    }
+  }
 
   constructor(props) {
     super(props);
     this.state = {
-      visible: false, loginHasFocus: false, passwdHasFocus: false
+      visible: false,
+      loginHasFocus: false,
+      passwdHasFocus: false,
     };
   }
 
@@ -43,6 +79,7 @@ export default class Login extends Component {
         }
         else {
         	console.log('wrong passwd or login');
+          console.log(responseJson[1]);
         }
       })
       .catch((error) => {
@@ -93,17 +130,30 @@ export default class Login extends Component {
     dismissKeyboard();
     this.setState({
       visible: true,
-
     });
-
-    this.getAuthToken(this.state.login, md5.hex_md5(this.state.password)).then((ret) => {
+    global.passwd_md5 = md5.hex_md5(this.state.password);
+    this.getAuthToken(this.state.login, global.passwd_md5).then((ret) => {
       [url, token] = ret;
       this.loginIn(url, 'login', JSON.stringify({'login':this.state.login, 'token': token})).then( (sid) => {
         this.getListMail(url, 'eac_list',JSON.stringify({'mailbox': '@AppInMail'}), sid).then( (listMail ) =>{
           this.props.navigation.navigate('ListMail', { listings: listMail });
-          this.setState({
-            visible: false
-          });
+          try {
+            AsyncStorage.getItem('login').then(login => {
+              if (login == null){
+                AsyncStorage.setItem('login', this.state.login);
+                AsyncStorage.setItem('passwd_md5', global.passwd_md5);
+              }
+            else {
+              try{
+                AsyncStorage.clear();
+              } catch(error){
+                console.log(error);
+              }
+            }})
+          } catch (error) {
+            console.log("Error saving data: " + error);
+          }
+          this.setState({visible: false});
         });
       });
     });
@@ -135,6 +185,7 @@ export default class Login extends Component {
           </View>
           <View style={{ marginBottom: 20 }}>
             <TextInput
+              ref='PasswdTextInput'
               onBlur={ () => {this.setState({passwdHasFocus: !this.state.passwdHasFocus})}}
               onFocus={ () => {this.setState({passwdHasFocus: !this.state.passwdHasFocus})}}
               secureTextEntry={true}

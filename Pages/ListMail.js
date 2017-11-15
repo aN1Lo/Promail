@@ -1,4 +1,6 @@
 import React, { Component } from 'react';
+import Icon from 'react-native-vector-icons/Octicons';
+import { NavigationActions } from 'react-navigation';
 
 import {
   StyleSheet,
@@ -7,12 +9,16 @@ import {
   TouchableHighlight,
   FlatList,
   Text,
-  ScrollView
+  ScrollView,
+  Platform,
+  AsyncStorage
 } from 'react-native';
 
-import Mail from './Mail'
+import Mail from './Mail';
+import Login from './Login';
 
 class ListItem extends React.PureComponent {
+
   constructor(props) {
     super();
     this.state = {
@@ -53,6 +59,31 @@ class ListItem extends React.PureComponent {
 }
 
 export default class ListMail extends Component {
+
+  static navigationOptions = ({ navigation }) => ({
+    headerLeft: (Platform.OS === 'ios') ? (
+      <Icon.Button name="sign-out" backgroundColor="#F7F7F7" color="#037aff" onPress={ () => {
+        const resetAction = NavigationActions.reset({
+          index: 0,
+          actions: [
+            NavigationActions.navigate({ routeName: 'Login'})
+          ]
+        });
+        navigation.dispatch(resetAction);
+        try {
+          AsyncStorage.multiRemove(['login', 'passwd_md5'], (err) => {});
+        } catch (error) {
+          console.log("Error remooving data: " + error);
+        }
+      } }>
+        <Text style={{fontSize: 17, paddingRight: 10, color: "#037aff"}}>Logout</Text>
+      </Icon.Button>
+    ) : (
+      <Icon.Button name="sign-out" backgroundColor="#FFF" color="#000" onPress={ () => navigation.goBack(null) }>
+      </Icon.Button>
+    )
+  });
+
   _keyExtractor = (item, index) => index;
 
   _renderItem = ({item, index}) => (
@@ -67,7 +98,7 @@ export default class ListMail extends Component {
     this.setState({
       visible: true
     });
-    this.props.navigation.navigate('Mail', { title: item.subject, listings: item });
+    this.props.navigation.navigate('Mail', { name: item.subject, listings: item });
   };
 
   render() {

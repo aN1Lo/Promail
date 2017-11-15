@@ -1,5 +1,4 @@
 import React from 'react';
-import { Platform, StatusBar } from 'react-native';
 import { StackNavigator } from 'react-navigation';
 
 import Login from '../Pages/Login';
@@ -23,7 +22,7 @@ export const MailStack = StackNavigator({
   Mail: {
     screen: Mail,
     navigationOptions: ({ navigation }) => ({
-      title: `${navigation.state.params.subject}`,
+      title: `${navigation.state.params.name}`,
     }),
   },
 });
