@@ -27,7 +27,8 @@
     "react-native-loading-spinner-overlay": "^0.5.2",
     "react-native-md5": "^1.0.0",
     "react-native-vector-icons": "^4.4.2",
-    "react-navigation": "^1.0.0-beta.15"
+    "react-navigation": "^1.0.0-beta.15",
+    "react-timestamp": "^4.3.0"
   },
   "rnpm": {
     "assets": [

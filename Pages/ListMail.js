@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import Icon from 'react-native-vector-icons/Octicons';
 import { NavigationActions } from 'react-navigation';
+import Timestamp from 'react-timestamp';
 
 import {
   StyleSheet,
@@ -19,20 +20,12 @@ import Login from './Login';
 
 class ListItem extends React.PureComponent {
 
-  constructor(props) {
-    super();
-    this.state = {
-      visible: false
-    };
-  }
-
   _onPress = () => {
     this.props.onPressItem(this.props.item);
   }
 
   render() {
     const item = this.props.item;
-
     return (
       <TouchableHighlight
         onPress={this._onPress}
@@ -47,8 +40,8 @@ class ListItem extends React.PureComponent {
                 numberOfLines={1}>From: {item.from_name}</Text>
               <Text style={styles.authorEmail}
                 numberOfLines={1}>e-mail: {item.from_email}</Text>
+              <Timestamp time={item.timestamp} format='full' includeDay component={Text} style={styles.date}/>
             </View>
-
           </View>
           <View style={styles.separator}/>
         </View>
@@ -95,9 +88,6 @@ export default class ListMail extends Component {
   );
 
   _onPressItem = (item) => {
-    this.setState({
-      visible: true
-    });
     this.props.navigation.navigate('Mail', { name: item.subject, listings: item });
   };
 
@@ -141,6 +131,10 @@ const styles = StyleSheet.create({
   authorEmail: {
     fontSize: 10,
     color: '#9B9B9B'
+  },
+  date: {
+    fontSize: 12,
+    color: '#515151'
   },
   rowContainer: {
     flexDirection: 'row',
