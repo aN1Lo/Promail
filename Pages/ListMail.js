@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import Icon from 'react-native-vector-icons/Octicons';
 import { NavigationActions } from 'react-navigation';
 import Timestamp from 'react-timestamp';
-
+import Spinner from 'react-native-loading-spinner-overlay';
 import {
   StyleSheet,
   Image,
@@ -12,24 +12,64 @@ import {
   Text,
   ScrollView,
   Platform,
-  AsyncStorage
+  AsyncStorage,
+  RefreshControl
 } from 'react-native';
 
 import Mail from './Mail';
-import Login from './Login';
+import {Login, getAuthToken, loginIn, getListMail} from './Login';
 
 class ListItem extends React.PureComponent {
+  constructor(props) {
+    super(props);
+    this.state = {
+      visible: false,
+    };
+  }
+
+  _onTouchStart(){
+      let end = new Date();
+      let elapsed = end.getTime() - global.start.getTime();
+      if (elapsed>=270000){
+        global.start = end;
+        try {
+        AsyncStorage.getItem('login').then((login) => {
+          if (login !== null){
+            this.setState({
+              visible: true,
+            });
+            AsyncStorage.getItem('passwd_md5').then((passwd_md5) => {
+              getAuthToken(login, passwd_md5).then((ret) => {
+                [url, token] = ret;
+                loginIn(url, 'login', JSON.stringify({'login':this.state.login, 'token': token})).then( (sid) => {
+                  getListMail(url, 'eac_list',JSON.stringify({'mailbox': '@AppInMail'}), sid).then( (listMail ) =>{
+                    global.listMail=listMail;
+                    this.setState({
+                      visible: false,
+                    });
+                  });
+                });
+              });
+            })
+          } else if (login == null){
+            console.log('needed auth');
+          }
+        })
+      } catch (error) {
+        console.log("Error retrieving data: " + error);
+      }}
+  }
 
   _onPress = () => {
+    this._onTouchStart();
     this.props.onPressItem(this.props.item);
   }
 
   render() {
     const item = this.props.item;
     return (
-      <TouchableHighlight
-        onPress={this._onPress}
-        underlayColor='#dddddd' >
+      <View>
+      <TouchableHighlight onPress={this._onPress} underlayColor='#dddddd' >
         <View>
           <View style={styles.rowContainer}>
             <Image style={styles.thumb} source = {require('../Resources/mail.png')}/>
@@ -46,7 +86,10 @@ class ListItem extends React.PureComponent {
           <View style={styles.separator}/>
         </View>
       </TouchableHighlight>
-
+      <View style={{ flex: 1 }}>
+        <Spinner visible={this.state.visible} textStyle={{color: '#FFF'}} />
+      </View>
+      </View>
     );
   }
 }
@@ -77,14 +120,51 @@ export default class ListMail extends Component {
     )
   });
 
+  constructor(props) {
+    super(props);
+    this.state = {
+      refreshing: false,
+    };
+  }
+
+  _onRefresh() {
+    this.setState({
+      refreshing: true
+    });
+    let end = new Date();
+    let elapsed = end.getTime() - global.start.getTime();
+      global.start = end;
+      try {
+      AsyncStorage.getItem('login').then((login) => {
+        if (login !== null){
+          AsyncStorage.getItem('passwd_md5').then((passwd_md5) => {
+            getAuthToken(login, passwd_md5).then((ret) => {
+              [url, token] = ret;
+              loginIn(url, 'login', JSON.stringify({'login':this.state.login, 'token': token})).then( (sid) => {
+                getListMail(url, 'eac_list',JSON.stringify({'mailbox': '@AppInMail'}), sid).then( (listMail ) =>{
+                  global.listMail=listMail;
+                  this.setState({refreshing: false});
+                });
+              });
+            });
+          })
+        } else if (login == null){
+          console.log('needed auth');
+        }
+      })
+    } catch (error) {
+      console.log("Error retrieving data: " + error);
+    }
+  }
+
   _keyExtractor = (item, index) => index;
 
   _renderItem = ({item, index}) => (
-    <ListItem
-      item={item}
-      index={index}
-      onPressItem={this._onPressItem}
-    />
+      <ListItem
+        item={item}
+        index={index}
+        onPressItem={this._onPressItem}
+      />
   );
 
   _onPressItem = (item) => {
@@ -92,13 +172,18 @@ export default class ListMail extends Component {
   };
 
   render() {
-    const mails = this.props.navigation.state.params.listings
+    const mails = global.listMail//this.props.navigation.state.params.listings
     return (
-        <FlatList style={styles.highlight}
-          data={mails}
-          keyExtractor={this._keyExtractor}
-          renderItem={this._renderItem}
-        />
+      <FlatList style={styles.highlight}
+        data={mails}
+        keyExtractor={this._keyExtractor}
+        renderItem={this._renderItem}
+        refreshControl={<RefreshControl
+                        colors={["#515151", "#689F38"]}
+                        refreshing={this.state.refreshing}
+                        onRefresh={() => this._onRefresh()}
+                    />}
+      />
     );
   }
 }

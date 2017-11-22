@@ -3,7 +3,6 @@ import md5 from "react-native-md5";
 import Spinner from 'react-native-loading-spinner-overlay';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import dismissKeyboard from 'react-native-dismiss-keyboard';
-
 import {
   StyleSheet,
   Text,
@@ -12,7 +11,8 @@ import {
   Image,
   TouchableOpacity,
   Linking,
-  AsyncStorage
+  AsyncStorage,
+  AppState
 } from 'react-native';
 
 import Button from '../Components/Button';
@@ -20,15 +20,79 @@ import Label from '../Components/Label';
 
 import ListMail from './ListMail';
 
+export function getAuthToken(login, passwd) {
+  return fetch(`https://admin.appinmail.io/api/v1/experimental/promail/prepare_user_runtime_2?user_id=${login}&password_md5=${passwd}`,{
+    method: 'POST',
+    headers: {'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'}
+  }).then((response) => response.json())
+  .then((responseJson) => {
+      if (responseJson[0] == 'success'){
+        url = responseJson[1]['promail_url'];
+        token = responseJson[1]['access_token'];
+        return ([ url, token])
+      }
+      else {
+        console.log('wrong passwd or login');
+        console.log(responseJson[1]);
+      }
+    })
+    .catch((error) => {
+      console.error(error);
+    });
+  }
+
+export function loginIn(url, action, data) {
+  return fetch(url+`/restapi.py?action_name=${action}&xml_data=${data}`,{
+    method: 'POST',
+    headers: {'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'}
+  }).then((response) => response.json())
+  .then((responseJson) => {
+      if (responseJson[0] == 'success'){
+        sid = responseJson[1]['sid'];
+        return (sid)
+      }
+      else {
+        console.log('something wrong');
+      }
+    })
+    .catch((error) => {
+      console.error(error);
+    });
+}
+
+export function getListMail(url, action, data, sid) {
+  return fetch(url+`/restapi.py?action_name=${action}&xml_data=${data}&sid=${sid}`,{
+    method: 'POST',
+    headers: {'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'}
+  }).then((response) => response.json())
+  .then((responseJson) => {
+      if (responseJson[0] == 'success'){
+        listMail = responseJson[1];
+        return (listMail)
+      }
+      else {
+        console.log('something wrong');
+      }
+    })
+    .catch((error) => {
+      console.error(error);
+    });
+}
+
 export default class Login extends Component {
-  /*componentWillMount(){
-    try{
-      AsyncStorage.clear();
-    } catch(error){
-      console.log(error);
-    }
-  }*/
+  constructor(props) {
+    super(props);
+    this.state = {
+      visible: false,
+      loginHasFocus: false,
+      passwdHasFocus: false,
+      appState: AppState.currentState,
+    };
+  }
+
   componentDidMount() {
+    global.start = new Date();
+    AppState.addEventListener('change', this._handleAppStateChange);
     try {
       AsyncStorage.getItem('login').then(login => {
         if (login !== null){
@@ -36,11 +100,12 @@ export default class Login extends Component {
             visible: true,
           });
           AsyncStorage.getItem('passwd_md5').then(passwd_md5 => {
-            this.getAuthToken(login, passwd_md5).then((ret) => {
+            getAuthToken(login, passwd_md5).then((ret) => {
               [url, token] = ret;
-              this.loginIn(url, 'login', JSON.stringify({'login':this.state.login, 'token': token})).then( (sid) => {
-                this.getListMail(url, 'eac_list',JSON.stringify({'mailbox': '@AppInMail'}), sid).then( (listMail ) =>{
-                  this.props.navigation.navigate('ListMail', { listings: listMail });
+              loginIn(url, 'login', JSON.stringify({'login':this.state.login, 'token': token})).then( (sid) => {
+                getListMail(url, 'eac_list',JSON.stringify({'mailbox': '@AppInMail'}), sid).then( (listMail ) =>{
+                  global.listMail=listMail;
+                  this.props.navigation.navigate('ListMail');
                   this.setState({
                     visible: false,
                   });
@@ -55,101 +120,78 @@ export default class Login extends Component {
     }
   }
 
-  constructor(props) {
-    super(props);
-    this.state = {
-      visible: false,
-      loginHasFocus: false,
-      passwdHasFocus: false,
-    };
+  componentWillUnmount() {
+    AppState.removeEventListener('change', this._handleAppStateChange);
   }
 
-  getAuthToken = (login, passwd) => {
-  	return fetch(`https://admin.appinmail.io/api/v1/experimental/promail/prepare_user_runtime_2?user_id=${login}&password_md5=${passwd}`,{
-    	method: 'POST',
-    	headers: {'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'}
-    }).then((response) => response.json())
-    .then((responseJson) => {
-       	if (responseJson[0] == 'success'){
-         	url = responseJson[1]['promail_url'];
-         	token = responseJson[1]['access_token'];
-          global.url = url;
-          global.token = token;
-          return ([ url, token])
-        }
-        else {
-        	console.log('wrong passwd or login');
-          console.log(responseJson[1]);
-        }
-      })
-      .catch((error) => {
-        console.error(error);
-      });
+  _handleAppStateChange = (nextAppState) => {
+    if (this.state.appState.match(/inactive|background/) && nextAppState === 'active') {
+      console.log('App has come to the foreground!');
+      try {
+        AsyncStorage.getItem('login').then(login => {
+          console.log(login);
+          let end = new Date();
+          let elapsed = end.getTime() - global.start.getTime();
+          console.log(elapsed);
+          if (login !== null && elapsed>=270000){
+            global.start = end;
+            this.setState({
+              visible: true,
+            });
+            AsyncStorage.getItem('passwd_md5').then(passwd_md5 => {
+              getAuthToken(login, passwd_md5).then((ret) => {
+                [url, token] = ret;
+                loginIn(url, 'login', JSON.stringify({'login':this.state.login, 'token': token})).then( (sid) => {
+                  getListMail(url, 'eac_list',JSON.stringify({'mailbox': '@AppInMail'}), sid).then( (listMail ) =>{
+                    global.listMail=listMail;
+                    this.setState({
+                      visible: false,
+                    });
+                  });
+                });
+              });
+            })
+          }
+        })
+      } catch (error) {
+        console.log("Error retrieving data: " + error);
+      }
+    }
+    this.setState({appState: nextAppState});
   }
 
-  loginIn = (url, action, data) => {
-    return fetch(url+`/restapi.py?action_name=${action}&xml_data=${data}`,{
-    	method: 'POST',
-    	headers: {'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'}
-    }).then((response) => response.json())
-    .then((responseJson) => {
-       	if (responseJson[0] == 'success'){
-          sid = responseJson[1]['sid'];
-         	global.sid = sid;
-          return (sid)
-        }
-        else {
-        	console.log('something wrong');
-        }
-      })
-      .catch((error) => {
-        console.error(error);
-      });
-  }
-
-  getListMail = (url, action, data, sid) => {
-    return fetch(url+`/restapi.py?action_name=${action}&xml_data=${data}&sid=${sid}`,{
-    	method: 'POST',
-    	headers: {'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'}
-    }).then((response) => response.json())
-    .then((responseJson) => {
-       	if (responseJson[0] == 'success'){
-          listMail = responseJson[1];
-          return (listMail)
-        }
-        else {
-        	console.log('something wrong');
-        }
-      })
-      .catch((error) => {
-        console.error(error);
-      });
-  }
-
-  onTestPress = () => {
+  _onTestPress = () => {
     dismissKeyboard();
+    global.start = new Date();
     this.setState({
       visible: true,
     });
     global.passwd_md5 = md5.hex_md5(this.state.password);
-    this.getAuthToken(this.state.login, global.passwd_md5).then((ret) => {
+    getAuthToken(this.state.login, global.passwd_md5).then((ret) => {
       [url, token] = ret;
-      this.loginIn(url, 'login', JSON.stringify({'login':this.state.login, 'token': token})).then( (sid) => {
-        this.getListMail(url, 'eac_list',JSON.stringify({'mailbox': '@AppInMail'}), sid).then( (listMail ) =>{
-          this.props.navigation.navigate('ListMail', { listings: listMail });
+      global.url = url;
+      global.token = token;
+      loginIn(url, 'login', JSON.stringify({'login':this.state.login, 'token': token})).then( (sid) => {
+        global.sid = sid;
+        getListMail(url, 'eac_list',JSON.stringify({'mailbox': '@AppInMail'}), sid).then( (listMail ) =>{
+          global.listMail=listMail;
+          this.props.navigation.navigate('ListMail');//, { listings: listMail });
           try {
             AsyncStorage.getItem('login').then(login => {
               if (login == null){
                 AsyncStorage.setItem('login', this.state.login);
                 AsyncStorage.setItem('passwd_md5', global.passwd_md5);
               }
-            else {
-              try{
-                AsyncStorage.clear();
-              } catch(error){
-                console.log(error);
-              }
-            }})
+              else {
+                try{
+                  AsyncStorage.clear().then( () => {
+                    AsyncStorage.setItem('login', this.state.login);
+                    AsyncStorage.setItem('passwd_md5', global.passwd_md5);
+                  })
+                } catch(error){
+                  console.log(error);
+                }
+              }})
           } catch (error) {
             console.log("Error saving data: " + error);
           }
@@ -203,7 +245,7 @@ export default class Login extends Component {
               <Button
                 label="SIGN IN"
                 styles={{button: styles.primaryButton, label: styles.buttonWhiteText}}
-                onPress={() => this.onTestPress()}
+                onPress={() => this._onTestPress()}
               />
               </View>
               <View style={{ flex: 1 }}>
